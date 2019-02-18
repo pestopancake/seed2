@@ -1,0 +1,389 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="UTF-8" />
+        <title></title>
+        <script src="phaser.js"></script>
+    </head>
+    <body>
+
+    <script type="text/javascript">
+/**
+todo;
+- internal structure for block positions (grid)
+- on action button; touching b gets 'seeded'
+- seeded block grows new block above, pushes player up when made
+- seed types;
+  - fruit tree:
+     - new block above every x seconds
+     - destroying one gives a random seed
+     prose
+
+**/
+
+    window.onload = function() {
+
+      var config = {
+          width: window.innerWidth,
+          height: window.innerHeight,
+          renderer: Phaser.AUTO,
+          antialias: false,
+          multiTexture: true,
+          state: {
+              preload: preload,
+              create: create,
+              update: update,
+              render: render
+          }
+      };
+      var game = new Phaser.Game(config);
+
+      function preload() {
+          game.stage.backgroundColor = '#a5d5ff';
+
+          game.load.baseURL = window.location.href.substring(0, window.location.href.lastIndexOf('/')) + "/";
+          game.load.crossOrigin = 'anonymous';
+
+          game.load.image('player', 'dude.png');
+          game.load.spritesheet('playersprite', 'dude-anim.png', 16, 16, 5);
+          game.load.image('platform', 'platform.png');
+          game.load.image('block', 'block.png');
+
+      }
+
+      var player;
+      var blocks;
+      var cursors;
+      var jumpButton;
+      var digButton;
+      var actionButton;
+      var blockDestroyCooldown;
+      var hitboxes;
+      var hitboxL;
+      var hitboxR;
+      var hitboxB;
+
+      var activeBlock;
+      var activeBlockl;
+      var activeBlockr;
+
+      var activeBlocklTimer;
+      var activeBlocklWindup;
+      var destroyblockLallowed;
+      var activeBlockrTimer;
+      var activeBlockrWindup;
+      var destroyblockRallowed;
+
+      var beginJump;
+
+      var seedBlock;
+
+      function create() {
+          //game.physics.setBoundsToWorld();
+          game.world.setBounds(0,0,2000,2000);
+
+          player = game.add.sprite(game.width / 2, game.height / 3, 'player');
+          player.scale.x *= 2;
+          player.scale.y *= 2;
+          player.animations.add('walk');
+          // player.animations.play('walk', 5, true);
+          //  player.animations.stop(null, true);
+          player.anchor.x = 0.5;
+          player.anchor.y = 0.5;
+          game.physics.arcade.enable(player);
+          //player.body.setSize(5, 10, 8, 5);
+          player.body.collideWorldBounds = false;
+          player.checkWorldBounds = true;
+          player.body.gravity.y = 1000;
+          player.events.onOutOfBounds.add(reset, this);
+
+          game.camera.follow(player, Phaser.Camera.FOLLOW_LOCKON, 0.1, 0.1);
+
+          //player hitboxes
+          hitboxes = game.add.group();
+          hitboxes.enableBody = true;
+          player.addChild(hitboxes);
+          var hbSize = player.width / 4;
+          hitboxL = hitboxes.create(0, 0, null);
+          hitboxL.name = "hitboxL";
+          hitboxL.body.setSize(hbSize, hbSize, -player.width / 2 - (hbSize / 2), -hbSize / 2);
+          hitboxR = hitboxes.create(0, 0, null);
+          hitboxR.name = "hitboxR";
+          hitboxR.body.setSize(hbSize, hbSize, (player.width / 2) - (hbSize / 2), -hbSize / 2);
+          hitboxB = hitboxes.create(0, 0, null);
+          hitboxB.name = "hitboxB";
+          hitboxB.body.setSize(hbSize, hbSize, -hbSize / 2, (player.height / 2) - (hbSize / 2));
+
+          generateBlocks();
+
+          cursors = game.input.keyboard.createCursorKeys();
+          jumpButton = game.input.keyboard.addKey(Phaser.Keyboard.UP);
+          digButton = game.input.keyboard.addKey(Phaser.Keyboard.DOWN);
+          actionButton = game.input.keyboard.addKey(Phaser.Keyboard.SPACEBAR);
+
+          actionButton.onDown.add(function(){
+            if(activeBlock){
+              seedBlock = activeBlock;
+            }
+          }, this);
+
+      }
+
+      function reset(a){
+        player.reset(350,100);
+        blocks.destroy();
+        generateBlocks();
+      }
+
+      function update () {
+
+          blocks.forEach(function(block){
+            block.alpha = 1;
+          });
+
+          activeBlockl = null;
+          activeBlockr = null;
+          activeBlock = null;
+
+          game.physics.arcade.overlap(hitboxes, blocks, function(a,b){
+            //destroyblockRallowed = false;
+            if(a.name == 'hitboxL'){
+              activeBlockl = b;
+              activeBlockl.alpha = 0.8;
+            }
+            else if(a.name == 'hitboxR'){
+              activeBlockr = b;
+              activeBlockr.alpha = 0.8;
+            }
+            else if(a.name == 'hitboxB'){
+              activeBlock = b;
+              activeBlock.alpha = 0.8;
+            }
+          }, null, this);
+
+          game.physics.arcade.collide(player, blocks, function(a,b){
+          }, null, this);
+
+
+          if(player.body.touching.down){
+            // game.camera.follow(player, Phaser.Camera.FOLLOW_LOCKON, 0.1, 0.1);
+            game.camera.target = player;
+          }else{
+            var b = blocks.getFirstAlive();
+            // game.camera.follow(b, Phaser.Camera.FOLLOW_LOCKON, 0.1, 0.1);
+            game.camera.target = null;
+          }
+
+          if(player.body.touching.down){
+            if(!activeBlockr){
+              destroyblockRallowed = false;
+              activeBlockrWindup = false;
+                if(activeBlockrTimer)
+                  game.time.events.remove(activeBlockrTimer);
+            }
+            if(!activeBlockl){
+              destroyblockLallowed = false;
+              activeBlocklWindup = false;
+              if(activeBlocklTimer)
+                game.time.events.remove(activeBlocklTimer);
+            }
+          }
+          else{
+            if(activeBlockrTimer)
+              game.time.events.remove(activeBlockrTimer);
+            if(activeBlocklTimer)
+              game.time.events.remove(activeBlocklTimer);
+            activeBlockrWindup = false;
+            activeBlocklWindup = false;
+            destroyblockRallowed = false;
+            destroyblockLallowed = false;
+          }
+
+          if (!cursors.left.isDown && !cursors.right.isDown){
+              if(player.body.velocity.x > 0 || player.body.velocity.x < 0){
+                  if(player.body.velocity.x < 0.1 && player.body.velocity.x > -0.1){
+                      player.body.velocity.x = 0;
+                  }
+                  else{
+                      player.body.velocity.x = player.body.velocity.x * 0.9;
+                  }
+              }
+          }
+          if(player.body.velocity.x !== 0
+          || player.body.velocity.y !== 0){
+            player.animations.play('walk', 5, true);
+          }
+          else{
+            player.animations.stop(null, true);
+          }
+
+          if (cursors.left.isDown)
+          {
+              if(!activeBlockl){
+                  if(player.body.velocity.x > -250){
+                      player.body.velocity.x -= 10;
+                  }
+              }
+              else{
+                  player.body.velocity.x = 0;
+              }
+
+              if(player.body.onFloor() || player.body.touching.down){
+                  if(activeBlockl && !activeBlocklWindup){
+                    activeBlocklWindup = true;
+                    activeBlocklTimer = game.time.events.loop(
+                      500,
+                      function(){
+                        activeBlocklWindup = false;
+                        destroyblockLallowed = true;
+                        game.time.events.remove(activeBlocklTimer);
+                      },
+                      this
+                    );
+                  }
+                  if(activeBlockl && destroyblockLallowed){
+                    destroyblockLallowed = false;
+                    activeBlockl.destroy();
+                  }
+              }
+          }
+          else if (cursors.right.isDown)
+          {
+              if(!activeBlockr){
+                  if(player.body.velocity.x < 250){
+                      player.body.velocity.x += 10;
+                  }
+              }
+              else{
+                  player.body.velocity.x = 0;
+              }
+
+              if(player.body.onFloor() || player.body.touching.down){
+                  if(activeBlockr && !activeBlockrWindup){
+                    activeBlockrWindup = true;
+                    activeBlockrTimer = game.time.events.loop(
+                      500,
+                      function(){
+                        activeBlockrWindup = false;
+                        destroyblockRallowed = true;
+                        game.time.events.remove(activeBlockrTimer);
+                      },
+                      this
+                    );
+                  }
+                  if(activeBlockr && destroyblockRallowed){
+                    destroyblockRallowed = false;
+                    activeBlockr.destroy();
+                  }
+              }
+
+          }
+
+          if(beginJump && !jumpButton.isDown){
+            beginJump = false;
+          }
+          if (jumpButton.isDown && (player.body.onFloor() || player.body.touching.down || beginJump))
+          {
+              if(beginJump){
+                  player.body.velocity.y -= 50 / (beginJump*0.4);
+                  if(beginJump > 200){
+                      beginJump = false;
+                  }
+                  ++beginJump;
+              }else{
+                  player.body.velocity.y = -150;
+                  beginJump = 1;
+              }
+          }
+
+          if (digButton.isDown && (player.body.onFloor() || player.body.touching.down)
+            && activeBlock
+            && !blockDestroyCooldown)
+          {
+              blockDestroyCooldown = true;
+              activeBlock.destroy();
+              blockDestroyCooldownTimer = game.time.events.loop(
+                150,
+                function(){
+                  blockDestroyCooldown = false;
+                  game.time.events.remove(blockDestroyCooldownTimer);
+                },
+                this
+              );
+          }
+      }
+
+      function render () {
+
+        game.debug.bodyInfo(player, 32, 32);
+
+        game.debug.body(player);
+        game.debug.body(hitboxL);
+        game.debug.body(hitboxR);
+        game.debug.body(hitboxB);
+
+      }
+
+      //game logic
+      function generateBlocks() {
+          blocks = game.add.physicsGroup();
+
+          var width = height = 8;
+          var blockSize = 32;
+          var startX = (game.width / 2) - ((width*blockSize) / 2);
+          var startY = (game.width / 2) - ((width*blockSize) / 2);
+
+          for(var x = 1; x<width; ++x){
+            for(var y = 1; y<height; ++y){
+              var block = blocks.create(
+                startX + (x*blockSize),
+                startY + (y*blockSize),
+                'block'
+              );
+              block.tint = Math.random() * 0xffffff;
+            }
+          }
+          blocks.setAll('body.immovable', true);
+
+          //seed test
+          function blockAt(x,y){
+            var spaceTaken = false;
+            blocks.forEach(function(b) {
+              if(b.x == x
+                && b.y == y){
+                  spaceTaken = true;
+              }
+            });
+            return spaceTaken;
+          }
+          newBlockTestTimer = game.time.events.loop(
+            200,
+            function(){
+              if(seedBlock && seedBlock.alive){
+                var spaceTaken = blockAt(seedBlock.x + (blockSize), seedBlock.y);
+                if(!spaceTaken){
+                  var block = blocks.create(
+                    seedBlock.x + (blockSize),
+                    seedBlock.y,
+                    'block'
+                  );
+                  block.body.immovable = true;
+                  block.tint = Math.random() * 0xffffff;
+                  seedBlock = block;
+                }
+              }
+
+              //game.time.events.remove(blockDestroyCooldownTimer);
+            },
+            this
+          );
+      }
+
+    };
+
+
+
+    </script>
+
+    </body>
+</html>
