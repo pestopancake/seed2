@@ -3,6 +3,14 @@ import Phaser from 'phaser'
 import Mushroom from '../sprites/Mushroom'
 import lang from '../lang'
 
+/*
+* TODO:
+* split into;
+* - Block
+* - Player
+*
+*/
+
 export default class extends Phaser.State {
   init () {
     this.player = null
@@ -35,23 +43,12 @@ export default class extends Phaser.State {
   preload () { }
 
   create () {
-    const bannerText = lang.text('welcome')
-    let banner = this.add.text(this.world.centerX, this.game.height - 80, bannerText, {
-      font: '40px Bangers',
-      fill: '#77BFA3',
-      smoothed: false
-    })
-
-    banner.padding.set(10, 16)
-    banner.anchor.setTo(0.5)
-
     this.mushroom = new Mushroom({
       game: this.game,
       x: this.world.centerX,
       y: this.world.centerY,
       asset: 'block'
     })
-
     this.game.add.existing(this.mushroom)
 
     // game.physics.setBoundsToWorld()
@@ -315,7 +312,7 @@ export default class extends Phaser.State {
 
     // seed test
     this.newBlockTestTimer = this.game.time.events.loop(
-      200,
+      500,
       function () {
         if (this.seedBlock && this.seedBlock.alive) {
           if (this.seedBlock.genetics.lifespan > 0) {
