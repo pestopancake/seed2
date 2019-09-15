@@ -11387,6 +11387,10 @@ var _Mushroom = __webpack_require__(/*! ../sprites/Mushroom */ 347);
 
 var _Mushroom2 = _interopRequireDefault(_Mushroom);
 
+var _Block = __webpack_require__(/*! ../sprites/Block */ 351);
+
+var _Block2 = _interopRequireDefault(_Block);
+
 var _lang = __webpack_require__(/*! ../lang */ 348);
 
 var _lang2 = _interopRequireDefault(_lang);
@@ -11402,10 +11406,11 @@ function _inherits(subClass, superClass) { if (typeof superClass !== "function" 
 
 /*
 * TODO:
-* split into;
-* - Block
-* - Player
-*
+* kill player if squished or dont seed a block there
+* seed types
+* multiple active seeds
+* permanent blocks
+* move ceiling up, or infinite
 */
 
 var _class = function (_Phaser$State) {
@@ -11446,6 +11451,7 @@ var _class = function (_Phaser$State) {
       this.beginJump = null;
 
       this.seedBlock = null;
+      this.blockSize = 16 * 4;
     }
   }, {
     key: 'preload',
@@ -11459,9 +11465,9 @@ var _class = function (_Phaser$State) {
         y: this.world.centerY,
         asset: 'mushroom'
       });
-      this.mushroom.scale.x *= 4;
-      this.mushroom.scale.y *= 4;
-      this.game.add.existing(this.mushroom);
+      // this.mushroom.scale.x *= 4
+      // this.mushroom.scale.y *= 4
+      //this.game.add.existing(this.mushroom)
 
       // game.physics.setBoundsToWorld()
       this.game.world.setBounds(0, 0, 2000, 2000);
@@ -11510,7 +11516,9 @@ var _class = function (_Phaser$State) {
           this.activeBlock.genetics = {
             lifespan: 5
           };
+          this.germinateTickInt = 0;
           this.seedBlock = this.activeBlock;
+          this.seedBlock.lifespan = 100000;
         }
       }, this);
     }
@@ -11531,8 +11539,12 @@ var _class = function (_Phaser$State) {
   }, {
     key: 'update',
     value: function update() {
+      this.germinateTick();
+
       this.blocks.forEach(function (block) {
-        block.alpha = 1;
+        if (block.tint === 0xdddddd) {
+          block.tint = 0xffffff;
+        }
       });
 
       this.activeBlockl = null;
@@ -11543,13 +11555,13 @@ var _class = function (_Phaser$State) {
         // destroyblockRallowed = false;
         if (a.name === 'hitboxL') {
           this.activeBlockl = b;
-          this.activeBlockl.alpha = 0.8;
+          this.activeBlockl.tint = 0xdddddd;
         } else if (a.name === 'hitboxR') {
           this.activeBlockr = b;
-          this.activeBlockr.alpha = 0.8;
+          this.activeBlockr.tint = 0xdddddd;
         } else if (a.name === 'hitboxB') {
           this.activeBlock = b;
-          this.activeBlock.alpha = 0.8;
+          this.activeBlock.tint = 0xdddddd;
         }
       }, null, this);
 
@@ -11600,6 +11612,7 @@ var _class = function (_Phaser$State) {
       }
 
       if (this.cursors.left.isDown) {
+        this.player.scale.x = -2;
         if (!this.activeBlockl) {
           if (this.player.body.velocity.x > -250) {
             this.player.body.velocity.x -= 10;
@@ -11623,6 +11636,7 @@ var _class = function (_Phaser$State) {
           }
         }
       } else if (this.cursors.right.isDown) {
+        this.player.scale.x = 2;
         if (!this.activeBlockr) {
           if (this.player.body.velocity.x < 250) {
             this.player.body.velocity.x += 10;
@@ -11684,43 +11698,116 @@ var _class = function (_Phaser$State) {
       return spaceTaken;
     }
   }, {
+    key: 'blockAtR',
+    value: function blockAtR(block) {
+      return this.blockAt(block.x + this.blockSize, block.y);
+    }
+  }, {
+    key: 'blockAtL',
+    value: function blockAtL(block) {
+      return this.blockAt(block.x - this.blockSize, block.y);
+    }
+  }, {
+    key: 'blockAtU',
+    value: function blockAtU(block) {
+      return this.blockAt(block.x, block.y - this.blockSize);
+    }
+  }, {
+    key: 'blockAtD',
+    value: function blockAtD(block) {
+      return this.blockAt(block.x, block.y + this.blockSize);
+    }
+  }, {
+    key: 'randomAdjacent',
+    value: function randomAdjacent(block) {
+      var randX = Math.floor(Math.rand() * 3 - 1);
+      var randY = Math.floor(Math.rand() * 3 - 1);
+      return {
+        x: block.x + this.blockSize * randX,
+        y: block.y + this.blockSize * randY
+      };
+    }
+  }, {
     key: 'generateBlocks',
     value: function generateBlocks() {
       this.blocks = this.game.add.physicsGroup();
 
-      var height = 8;
-      var width = 8;
-      var blockSize = 16 * 4;
-      var startX = this.game.width / 2 - width * blockSize / 2;
-      var startY = this.game.width / 2 - width * blockSize / 2;
+      var height = 16;
+      var width = 16;
+      var startX = this.game.width / 2 - width * this.blockSize / 2;
+      var startY = this.game.width / 2 - width * this.blockSize / 2;
 
       for (var x = 1; x < width; ++x) {
         for (var y = 1; y < height; ++y) {
-          var block = this.blocks.create(startX + x * blockSize, startY + y * blockSize, 'block');
-          // block.tint = Math.random() * 0xffffff
-          block.scale.setTo(4, 4);
+          this.blocks.add(new _Block2.default({
+            game: this.game,
+            x: startX + x * this.blockSize,
+            y: startY + y * this.blockSize,
+            lifespan: 10000 + Math.random() * 100000
+          }));
         }
       }
       this.blocks.setAll('body.immovable', true);
-
-      // seed test
-      this.newBlockTestTimer = this.game.time.events.loop(500, function () {
-        if (this.seedBlock && this.seedBlock.alive) {
-          if (this.seedBlock.genetics.lifespan > 0) {
-            var spaceTaken = this.blockAt(this.seedBlock.x + blockSize, this.seedBlock.y);
-            if (!spaceTaken) {
-              var block = this.blocks.create(this.seedBlock.x + blockSize, this.seedBlock.y, 'block');
-              block.scale.setTo(4, 4);
-              block.body.immovable = true;
-              block.tint = Math.random() * 0xffffff;
-              block.genetics = {
-                lifespan: this.seedBlock.genetics.lifespan - 1
-              };
-              this.seedBlock = block;
+    }
+  }, {
+    key: 'germinateTick',
+    value: function germinateTick() {
+      if (!this.germinateTickInt) this.germinateTickInt = 0;
+      if (this.germinateTickInt > 1000) {
+        this.germinate();
+        this.germinateTickInt = 0;
+      } else {
+        this.germinateTickInt += this.game.time.elapsed;
+      }
+    }
+  }, {
+    key: 'germinate',
+    value: function germinate() {
+      if (this.seedBlock && this.seedBlock.alive) {
+        if (this.seedBlock.genetics.lifespan > 0) {
+          var offsetX = 0;
+          var offsetY = 0;
+          var bu = this.blockAtU(this.seedBlock);
+          var bl = this.blockAtL(this.seedBlock);
+          var br = this.blockAtR(this.seedBlock);
+          if (!bu) {
+            if (!Math.floor(Math.random() * 10) && !bl) {
+              offsetX = -this.blockSize;
+            } else if (!Math.floor(Math.random() * 10) && !br) {
+              offsetX = this.blockSize;
+            } else {
+              offsetY = -this.blockSize;
             }
+          } else if (!bl && !br) {
+            offsetX = (Math.floor(Math.random() * 2) - 1) * this.blockSize;
+          } else if (!bl) {
+            offsetX = -this.blockSize;
+          } else if (!br) {
+            offsetX = this.blockSize;
+          } else if (!this.blockAtD(this.seedBlock)) {
+            offsetY = this.blockSize;
+          }
+          if (offsetX || offsetY) {
+            var x = this.seedBlock.x + offsetX;
+            var y = this.seedBlock.y + offsetY;
+            if (this.player.x + this.player.width / 2 > x && this.player.x < x + this.blockSize && this.player.y + this.player.height / 2 > y && this.player.y < y + this.blockSize) {
+              this.player.y = this.seedBlock.y - this.blockSize - this.player.height;
+            }
+
+            var block = this.blocks.add(new _Block2.default({
+              game: this.game,
+              x: x,
+              y: y,
+              lifespan: 100000
+            }));
+            block.body.immovable = true;
+            block.genetics = {
+              lifespan: this.seedBlock.genetics.lifespan - 1
+            };
+            this.seedBlock = block;
           }
         }
-      }, this);
+      }
     }
   }]);
 
@@ -11773,6 +11860,8 @@ var _class = function (_Phaser$Sprite) {
     var _this = _possibleConstructorReturn(this, (_class.__proto__ || Object.getPrototypeOf(_class)).call(this, game, x, y, asset));
 
     _this.anchor.setTo(0.5);
+    _this.scale.setTo(4, 4);
+    _this.game.add.existing(_this);
     return _this;
   }
 
@@ -11876,6 +11965,91 @@ var idiom = function idiom(languages) {
 };
 
 exports.default = idiom;
+
+/***/ }),
+/* 350 */,
+/* 351 */
+/*!******************************!*\
+  !*** ./src/sprites/Block.js ***!
+  \******************************/
+/*! dynamic exports provided */
+/*! all exports used */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+
+var _phaser = __webpack_require__(/*! phaser */ 47);
+
+var _phaser2 = _interopRequireDefault(_phaser);
+
+function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
+
+function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+
+function _possibleConstructorReturn(self, call) { if (!self) { throw new ReferenceError("this hasn't been initialised - super() hasn't been called"); } return call && (typeof call === "object" || typeof call === "function") ? call : self; }
+
+function _inherits(subClass, superClass) { if (typeof superClass !== "function" && superClass !== null) { throw new TypeError("Super expression must either be null or a function, not " + typeof superClass); } subClass.prototype = Object.create(superClass && superClass.prototype, { constructor: { value: subClass, enumerable: false, writable: true, configurable: true } }); if (superClass) Object.setPrototypeOf ? Object.setPrototypeOf(subClass, superClass) : subClass.__proto__ = superClass; }
+
+var _class = function (_Phaser$Sprite) {
+  _inherits(_class, _Phaser$Sprite);
+
+  function _class(_ref) {
+    var game = _ref.game,
+        x = _ref.x,
+        y = _ref.y,
+        asset = _ref.asset,
+        lifespan = _ref.lifespan;
+
+    _classCallCheck(this, _class);
+
+    if (!asset) asset = 'block';
+
+    var _this = _possibleConstructorReturn(this, (_class.__proto__ || Object.getPrototypeOf(_class)).call(this, game, x, y, asset));
+
+    _this.game = game;
+    _this.lifespan = lifespan;
+    _this.age = 0;
+    _this.scale.setTo(4, 4);
+    // this.game.add.existing(this)
+    return _this;
+  }
+
+  _createClass(_class, [{
+    key: 'update',
+    value: function update() {
+      this.age += this.game.time.elapsed;
+      this.alpha = 1 - this.age / (this.lifespan * 0.9);
+      if (this.alpha < 0.2) {
+        this.alpha = 0.2;
+      }
+      if (this.age > this.lifespan) {
+        this.tint = 0xff0000;
+        this.body.gravity.y = 1500;
+        this.body.immovable = false;
+        this.body.checkCollision.down = false;
+      } else {
+        if (this.genetics && this.genetics.lifespan > 0) {
+          this.tint = _phaser2.default.Color.packPixel(255 / 5 * (5 - this.genetics.lifespan), 255, 255 / 5 * (5 - this.genetics.lifespan), 1);
+        }
+      }
+      if (this.age > this.lifespan * 2) {
+        this.destroy();
+        // this.body.immovable = false
+      }
+    }
+  }]);
+
+  return _class;
+}(_phaser2.default.Sprite);
+
+exports.default = _class;
 
 /***/ })
 ],[135]);

@@ -1,14 +1,16 @@
 /* globals __DEV__ */
 import Phaser from 'phaser'
 import Mushroom from '../sprites/Mushroom'
+import Block from '../sprites/Block'
 import lang from '../lang'
 
 /*
 * TODO:
-* split into;
-* - Block
-* - Player
-*
+* kill player if squished or dont seed a block there
+* seed types
+* multiple active seeds
+* permanent blocks
+* move ceiling up, or infinite
 */
 
 export default class extends Phaser.State {
@@ -39,6 +41,7 @@ export default class extends Phaser.State {
     this.beginJump = null
 
     this.seedBlock = null
+    this.blockSize = 16 * 4
   }
   preload () { }
 
@@ -49,9 +52,9 @@ export default class extends Phaser.State {
       y: this.world.centerY,
       asset: 'mushroom'
     })
-    this.mushroom.scale.x *= 4
-    this.mushroom.scale.y *= 4
-    this.game.add.existing(this.mushroom)
+    // this.mushroom.scale.x *= 4
+    // this.mushroom.scale.y *= 4
+    //this.game.add.existing(this.mushroom)
 
     // game.physics.setBoundsToWorld()
     this.game.world.setBounds(0, 0, 2000, 2000)
@@ -100,7 +103,9 @@ export default class extends Phaser.State {
         this.activeBlock.genetics = {
           lifespan: 5
         }
+        this.germinateTickInt = 0
         this.seedBlock = this.activeBlock
+        this.seedBlock.lifespan = 100000
       }
     }, this)
   }
@@ -118,8 +123,12 @@ export default class extends Phaser.State {
   }
 
   update () {
+    this.germinateTick()
+
     this.blocks.forEach(function (block) {
-      block.alpha = 1
+      if (block.tint === 0xdddddd) {
+        block.tint = 0xffffff
+      }
     })
 
     this.activeBlockl = null
@@ -130,13 +139,13 @@ export default class extends Phaser.State {
       // destroyblockRallowed = false;
       if (a.name === 'hitboxL') {
         this.activeBlockl = b
-        this.activeBlockl.alpha = 0.8
+        this.activeBlockl.tint = 0xdddddd
       } else if (a.name === 'hitboxR') {
         this.activeBlockr = b
-        this.activeBlockr.alpha = 0.8
+        this.activeBlockr.tint = 0xdddddd
       } else if (a.name === 'hitboxB') {
         this.activeBlock = b
-        this.activeBlock.alpha = 0.8
+        this.activeBlock.tint = 0xdddddd
       }
     }, null, this)
 
@@ -188,6 +197,7 @@ export default class extends Phaser.State {
     }
 
     if (this.cursors.left.isDown) {
+      this.player.scale.x = -2
       if (!this.activeBlockl) {
         if (this.player.body.velocity.x > -250) {
           this.player.body.velocity.x -= 10
@@ -215,6 +225,7 @@ export default class extends Phaser.State {
         }
       }
     } else if (this.cursors.right.isDown) {
+      this.player.scale.x = 2
       if (!this.activeBlockr) {
         if (this.player.body.velocity.x < 250) {
           this.player.body.velocity.x += 10
@@ -262,7 +273,7 @@ export default class extends Phaser.State {
     if (
       this.digButton.isDown &&
       (
-        this.player.body.onFloor() || 
+        this.player.body.onFloor() ||
         this.player.body.touching.down
       ) &&
       this.activeBlock &&
@@ -291,53 +302,112 @@ export default class extends Phaser.State {
     return spaceTaken
   }
 
+  blockAtR (block) {
+    return this.blockAt(block.x + (this.blockSize), block.y)
+  }
+
+  blockAtL (block) {
+    return this.blockAt(block.x - (this.blockSize), block.y)
+  }
+
+  blockAtU (block) {
+    return this.blockAt(block.x, block.y - (this.blockSize))
+  }
+
+  blockAtD (block) {
+    return this.blockAt(block.x, block.y + (this.blockSize))
+  }
+
+  randomAdjacent (block) {
+    var randX = Math.floor((Math.rand() * 3) - 1)
+    var randY = Math.floor((Math.rand() * 3) - 1)
+    return {
+      x: block.x + (this.blockSize * randX),
+      y: block.y + (this.blockSize * randY)
+    }
+  }
+
   generateBlocks () {
     this.blocks = this.game.add.physicsGroup()
 
-    var height = 8
-    var width = 8
-    var blockSize = 16 * 4
-    var startX = (this.game.width / 2) - ((width * blockSize) / 2);
-    var startY = (this.game.width / 2) - ((width * blockSize) / 2)
+    var height = 16
+    var width = 16
+    var startX = (this.game.width / 2) - ((width * this.blockSize) / 2)
+    var startY = (this.game.width / 2) - ((width * this.blockSize) / 2)
 
     for (var x = 1; x < width; ++x) {
       for (var y = 1; y < height; ++y) {
-        var block = this.blocks.create(
-          startX + (x * blockSize),
-          startY + (y * blockSize),
-          'block'
-        )
-        // block.tint = Math.random() * 0xffffff
-        block.scale.setTo(4, 4)
+        this.blocks.add(new Block({
+          game: this.game,
+          x: startX + (x * this.blockSize),
+          y: startY + (y * this.blockSize),
+          lifespan: 10000 + (Math.random() * 100000)
+        }))
       }
     }
     this.blocks.setAll('body.immovable', true)
+  }
 
-    // seed test
-    this.newBlockTestTimer = this.game.time.events.loop(
-      500,
-      function () {
-        if (this.seedBlock && this.seedBlock.alive) {
-          if (this.seedBlock.genetics.lifespan > 0) {
-            var spaceTaken = this.blockAt(this.seedBlock.x + (blockSize), this.seedBlock.y)
-            if (!spaceTaken) {
-              var block = this.blocks.create(
-                this.seedBlock.x + (blockSize),
-                this.seedBlock.y,
-                'block'
-              )
-              block.scale.setTo(4, 4)
-              block.body.immovable = true
-              block.tint = Math.random() * 0xffffff
-              block.genetics = {
-                lifespan: this.seedBlock.genetics.lifespan - 1
-              }
-              this.seedBlock = block
-            }
+  germinateTick () {
+    if (!this.germinateTickInt) this.germinateTickInt = 0
+    if (this.germinateTickInt > 1000) {
+      this.germinate()
+      this.germinateTickInt = 0
+    } else {
+      this.germinateTickInt += this.game.time.elapsed
+    }
+  }
+
+  germinate () {
+    if (this.seedBlock && this.seedBlock.alive) {
+      if (this.seedBlock.genetics.lifespan > 0) {
+        var offsetX = 0
+        var offsetY = 0
+        var bu = this.blockAtU(this.seedBlock)
+        var bl = this.blockAtL(this.seedBlock)
+        var br = this.blockAtR(this.seedBlock)
+        if (!bu) {
+          if (!Math.floor(Math.random() * 10) && !bl) {
+            offsetX = -this.blockSize
+          } else if (!Math.floor(Math.random() * 10) && !br) {
+            offsetX = this.blockSize
+          } else {
+            offsetY = -this.blockSize
           }
+        } else if (!bl && !br) {
+          offsetX = (Math.floor(Math.random() * 2) - 1) * this.blockSize
+        } else if (!bl) {
+          offsetX = -this.blockSize
+        } else if (!br) {
+          offsetX = this.blockSize
+        } else if (!this.blockAtD(this.seedBlock)) {
+          offsetY = this.blockSize
         }
-      },
-      this
-    )
+        if (offsetX || offsetY) {
+          let x = this.seedBlock.x + offsetX
+          let y = this.seedBlock.y + offsetY
+          if (
+            this.player.x + (this.player.width / 2) > x &&
+            this.player.x < x + this.blockSize &&
+            this.player.y + (this.player.height / 2) > y &&
+            this.player.y < y + this.blockSize
+          ) {
+            this.player.y = this.seedBlock.y - this.blockSize - this.player.height
+          }
+
+          var block = this.blocks.add(new Block({
+            game: this.game,
+            x: x,
+            y: y,
+            lifespan: 100000
+          }))
+          block.body.immovable = true
+          block.genetics = {
+            lifespan: this.seedBlock.genetics.lifespan - 1
+          }
+          this.seedBlock = block
+        }
+      }
+    }
   }
 }
