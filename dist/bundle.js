@@ -4506,7 +4506,7 @@ exports.default = {
 /***/ (function(module, exports, __webpack_require__) {
 
 __webpack_require__(/*! babel-polyfill */136);
-module.exports = __webpack_require__(/*! /home/paul/Desktop/phaser-es6/src/main.js */338);
+module.exports = __webpack_require__(/*! /home/paul/Desktop/seed2/src/main.js */338);
 
 
 /***/ }),
@@ -11119,7 +11119,7 @@ var Game = function (_Phaser$Game) {
     var width = docElement.clientWidth > _config2.default.gameWidth ? _config2.default.gameWidth : docElement.clientWidth;
     var height = docElement.clientHeight > _config2.default.gameHeight ? _config2.default.gameHeight : docElement.clientHeight;
 
-    var _this = _possibleConstructorReturn(this, (Game.__proto__ || Object.getPrototypeOf(Game)).call(this, width, height, _phaser2.default.CANVAS, 'content', null));
+    var _this = _possibleConstructorReturn(this, (Game.__proto__ || Object.getPrototypeOf(Game)).call(this, width, height, _phaser2.default.CANVAS, 'content', null, null, false));
 
     _this.state.add('Boot', _Boot2.default, false);
     _this.state.add('Splash', _Splash2.default, false);
@@ -11224,7 +11224,7 @@ var _class = function (_Phaser$State) {
   _createClass(_class, [{
     key: 'init',
     value: function init() {
-      this.stage.backgroundColor = '#fafaff';
+      this.stage.backgroundColor = '#000';
       this.fontsReady = false;
       this.fontsLoaded = this.fontsLoaded.bind(this);
     }
@@ -11323,9 +11323,9 @@ var _class = function (_Phaser$State) {
       //
       // load your assets
       //
-      this.load.image('mushroom', 'assets/images/mushroom2.png');
-      this.load.image('block', 'assets/images/block.png');
-      this.load.image('player', 'assets/images/dude.png');
+      this.load.image('mushroom', 'assets/images/sk_026.png');
+      this.load.image('block', 'assets/images/sk_001.png');
+      this.load.image('player', 'assets/images/s_022.png');
       this.load.spritesheet('playersprite', 'assets/images/dude-anim.png', 16, 16, 5);
     }
   }, {
@@ -11457,8 +11457,10 @@ var _class = function (_Phaser$State) {
         game: this.game,
         x: this.world.centerX,
         y: this.world.centerY,
-        asset: 'block'
+        asset: 'mushroom'
       });
+      this.mushroom.scale.x *= 4;
+      this.mushroom.scale.y *= 4;
       this.game.add.existing(this.mushroom);
 
       // game.physics.setBoundsToWorld()
@@ -11476,7 +11478,7 @@ var _class = function (_Phaser$State) {
       // player.body.setSize(5, 10, 8, 5)
       this.player.body.collideWorldBounds = false;
       this.player.checkWorldBounds = true;
-      this.player.body.gravity.y = 1000;
+      this.player.body.gravity.y = 1500;
       this.player.events.onOutOfBounds.add(this.reset, this);
 
       this.game.camera.follow(this.player, _phaser2.default.Camera.FOLLOW_LOCKON, 0.1, 0.1);
@@ -11516,13 +11518,13 @@ var _class = function (_Phaser$State) {
     key: 'render',
     value: function render() {
       if (true) {
-        this.game.debug.spriteInfo(this.mushroom, 32, 32);
+        this.game.debug.spriteInfo(this.player, 32, 32);
       }
     }
   }, {
     key: 'reset',
     value: function reset(a) {
-      this.player.reset(350, 100);
+      this.player.reset(this.game.width / 2, this.game.height / 3);
       this.blocks.destroy();
       this.generateBlocks();
     }
@@ -11557,9 +11559,9 @@ var _class = function (_Phaser$State) {
         // game.camera.follow(player, Phaser.Camera.FOLLOW_LOCKON, 0.1, 0.1);
         this.game.camera.target = this.player;
       } else {
-        var b = this.blocks.getFirstAlive();
+        // var b = this.blocks.getFirstAlive()
         // game.camera.follow(b, Phaser.Camera.FOLLOW_LOCKON, 0.1, 0.1);
-        this.game.camera.target = null;
+        this.game.camera.target = this.player;
       }
 
       if (this.player.body.touching.down) {
@@ -11688,14 +11690,15 @@ var _class = function (_Phaser$State) {
 
       var height = 8;
       var width = 8;
-      var blockSize = 32;
+      var blockSize = 16 * 4;
       var startX = this.game.width / 2 - width * blockSize / 2;
       var startY = this.game.width / 2 - width * blockSize / 2;
 
       for (var x = 1; x < width; ++x) {
         for (var y = 1; y < height; ++y) {
           var block = this.blocks.create(startX + x * blockSize, startY + y * blockSize, 'block');
-          block.tint = Math.random() * 0xffffff;
+          // block.tint = Math.random() * 0xffffff
+          block.scale.setTo(4, 4);
         }
       }
       this.blocks.setAll('body.immovable', true);
@@ -11707,6 +11710,7 @@ var _class = function (_Phaser$State) {
             var spaceTaken = this.blockAt(this.seedBlock.x + blockSize, this.seedBlock.y);
             if (!spaceTaken) {
               var block = this.blocks.create(this.seedBlock.x + blockSize, this.seedBlock.y, 'block');
+              block.scale.setTo(4, 4);
               block.body.immovable = true;
               block.tint = Math.random() * 0xffffff;
               block.genetics = {

@@ -47,8 +47,10 @@ export default class extends Phaser.State {
       game: this.game,
       x: this.world.centerX,
       y: this.world.centerY,
-      asset: 'block'
+      asset: 'mushroom'
     })
+    this.mushroom.scale.x *= 4
+    this.mushroom.scale.y *= 4
     this.game.add.existing(this.mushroom)
 
     // game.physics.setBoundsToWorld()
@@ -66,7 +68,7 @@ export default class extends Phaser.State {
     // player.body.setSize(5, 10, 8, 5)
     this.player.body.collideWorldBounds = false
     this.player.checkWorldBounds = true
-    this.player.body.gravity.y = 1000
+    this.player.body.gravity.y = 1500
     this.player.events.onOutOfBounds.add(this.reset, this)
 
     this.game.camera.follow(this.player, Phaser.Camera.FOLLOW_LOCKON, 0.1, 0.1)
@@ -105,12 +107,12 @@ export default class extends Phaser.State {
 
   render () {
     if (__DEV__) {
-      this.game.debug.spriteInfo(this.mushroom, 32, 32)
+      this.game.debug.spriteInfo(this.player, 32, 32)
     }
   }
 
   reset (a) {
-    this.player.reset(350, 100)
+    this.player.reset(this.game.width / 2, this.game.height / 3)
     this.blocks.destroy()
     this.generateBlocks()
   }
@@ -145,21 +147,21 @@ export default class extends Phaser.State {
       // game.camera.follow(player, Phaser.Camera.FOLLOW_LOCKON, 0.1, 0.1);
       this.game.camera.target = this.player
     } else {
-      var b = this.blocks.getFirstAlive()
+      // var b = this.blocks.getFirstAlive()
       // game.camera.follow(b, Phaser.Camera.FOLLOW_LOCKON, 0.1, 0.1);
-      this.game.camera.target = null
+      this.game.camera.target = this.player
     }
 
     if (this.player.body.touching.down) {
       if (!this.activeBlockr) {
         this.destroyblockRallowed = false
         this.activeBlockrWindup = false
-        if (this.activeBlockrTimer) this.game.time.events.remove(this.activeBlockrTimer);
+        if (this.activeBlockrTimer) this.game.time.events.remove(this.activeBlockrTimer)
       }
       if (!this.activeBlockl) {
         this.destroyblockLallowed = false
         this.activeBlocklWindup = false
-        if (this.activeBlocklTimer) this.game.time.events.remove(this.activeBlocklTimer);
+        if (this.activeBlocklTimer) this.game.time.events.remove(this.activeBlocklTimer)
       }
     } else {
       if (this.activeBlockrTimer) this.game.time.events.remove(this.activeBlockrTimer)
@@ -294,7 +296,7 @@ export default class extends Phaser.State {
 
     var height = 8
     var width = 8
-    var blockSize = 32
+    var blockSize = 16 * 4
     var startX = (this.game.width / 2) - ((width * blockSize) / 2);
     var startY = (this.game.width / 2) - ((width * blockSize) / 2)
 
@@ -305,7 +307,8 @@ export default class extends Phaser.State {
           startY + (y * blockSize),
           'block'
         )
-        block.tint = Math.random() * 0xffffff
+        // block.tint = Math.random() * 0xffffff
+        block.scale.setTo(4, 4)
       }
     }
     this.blocks.setAll('body.immovable', true)
@@ -323,6 +326,7 @@ export default class extends Phaser.State {
                 this.seedBlock.y,
                 'block'
               )
+              block.scale.setTo(4, 4)
               block.body.immovable = true
               block.tint = Math.random() * 0xffffff
               block.genetics = {
